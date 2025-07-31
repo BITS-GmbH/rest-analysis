@@ -104,8 +104,8 @@ server.compression.enabled=true
 server.compression.min-response-size=2048
 server.compression.mime-types=text/html,text/xml,text/plain,text/css,application/json
 ```
-The mime types in the list are the ones that are compressed if the have a minimum size of 2048 bytes. To handle 
-the rest requests the `DemonoController` class is used.
+The mime types in the list are the ones that are compressed if they have a minimum body size of 2048 bytes. To handle 
+the rest requests the `DemoController` class is used.
 
 To support the compression of the request bodies the `DecompressionFilter` class is used. 
 It enables the use of compressed request bodies in the rest endpoints. That makes the compression of the requests and responses possible:
@@ -174,9 +174,9 @@ class DecompressionWrapper(request: HttpServletRequest, val contentEncoding: Str
     }
 }
 ```
-The `DecompressionFilter` class is a filter that is used in the Spring Boot filter chain for tomcat. All requests and responses pass through this filter in the chain. 
+The `DecompressionFilter` class is a filter, that is used in the Spring Boot filter chain for tomcat. All requests and responses pass through this filter in the chain. 
 The `DecompressionFilter` uses the `DecompressionWrapper` class to handle the request input stream according to the Content-Encoding header value.
-The `DecompressionWrapper` class checks the Content-Encoding header and uses the appropriate decompression method (GZIP or DEFLATE) to wrap the request input stream.
+The `DecompressionWrapper` class checks the Content-Encoding header and uses the appropriate decompression InputStream (GZIP or DEFLATE) to wrap the request input stream.
 The `getInputStream()` method creates and returns a `ServletInputStream` object with the wrapped input stream based on the Content-Encoding header value or returns the original ServletInputStream.
 
 ## The service to generate the large response
@@ -238,7 +238,7 @@ class DemoGrpcClient(val provider: LargeResponseProviderGrpc.LargeResponseProvid
 ```
 The `DemoGrpcClient` class gets the `LargeResponseProviderBlockingStub` injected as `provider` that is created during the build based on the `demo.proto` file.
 The method `getLargeResponse()` uses the provider to call the gRPC endpoint and return the `LargeResponse` object. The empty object is as placeholder needed for 
-a rpc method with a parameter. 
+a rpc method without a parameter. 
 The `handleEvent()` method is annotated with `@EventListener` to listen for the `ApplicationReadyEvent` event. This method is called after the application has started and calls the `getLargeResponse()` method to request a large response from the server.
 
 The `LargeResponseProviderBlockingStub` is a blocking stub that is used to call the gRPC endpoint is created in the `DemoGrpcConfig` class:
@@ -257,7 +257,7 @@ To enable the creation of the `LargeResponseProviderBlockingStub` bean the `larg
 spring.grpc.client.channels.large-response.address=localhost:8080
 spring.grpc.client.channels.large-response.negotiation-type=plaintext
 ```
-This configuration sets the address of the gRPC server to `localhost:8080` and uses plaintext negotiation for the gRPC communication. An alternative would be encryption with TLS, but this is not used in this project.
+This configuration sets the address of the gRPC server to `localhost:8080` and uses `plaintext` negotiation for the gRPC communication. An alternative would be encryption with TLS, but this is not used in this project.
 
 ## The implementation of the Rest client
 The client is implemented in the `DemoRestClient` class:
@@ -266,7 +266,7 @@ The client is implemented in the `DemoRestClient` class:
 class DemoRestClient {
     val logger = LoggerFactory.getLogger(DemoRestClient::class.java)
     val objectMapper = ObjectMapper().registerKotlinModule().registerModule(JavaTimeModule())
-    val restClient = RestClient.create();
+    val restClient = RestClient.create()
 
     @EventListener
     fun handleEvent(event: ApplicationReadyEvent) {
