@@ -257,5 +257,108 @@ To enable the creation of the `LargeResponseProviderBlockingStub` bean the `larg
 spring.grpc.client.channels.large-response.address=localhost:8080
 spring.grpc.client.channels.large-response.negotiation-type=plaintext
 ```
-This configuration sets the address of the gRPC server to `localhost:8080` and uses plaintext negotiation for the gRPC communication. A alternative would be encryption with TLS, but this is not used in this project.
+This configuration sets the address of the gRPC server to `localhost:8080` and uses plaintext negotiation for the gRPC communication. An alternative would be encryption with TLS, but this is not used in this project.
 
+## The implementation of the Rest client
+The client is implemented in the `DemoRestClient` class:
+```kotlin
+@Service
+class DemoRestClient {
+    val logger = LoggerFactory.getLogger(DemoRestClient::class.java)
+    val objectMapper = ObjectMapper().registerKotlinModule().registerModule(JavaTimeModule())
+    val restClient = RestClient.create();
+
+    @EventListener
+    fun handleEvent(event: ApplicationReadyEvent) {
+        val response = this.getLargeResponse()
+        logger.info("Received get response with ${response?.keyValuePairs?.size} key-value pairs.")
+        val responseCompressed = this.getLargeResponseCompressed()
+        logger.info("Received get compressed response with ${responseCompressed?.keyValuePairs?.size} key-value pairs.")
+        val postResponse = this.postLargeResponseCompressed()
+        logger.info("Received post compresssed request/response with ${postResponse?.keyValuePairs?.size} key-value pairs.")
+    }
+
+    fun getLargeResponse(): LargeResponse? {
+        val response = restClient.get().uri("http://localhost:8080/rest/demo/large-response")
+            .header(HttpHeaders.ACCEPT_ENCODING, "identity")
+            .exchange { request, response ->
+                //logger.info(response.headers.get(HttpHeaders.CONTENT_ENCODING)?.get(0)?.let { "Content-Encoding: $it" } ?: "No Content-Encoding header found")
+                handleEncodedResponse(response)
+            }
+        return response
+    }
+
+    fun getLargeResponseCompressed(): LargeResponse? {
+        val response = restClient.get().uri("http://localhost:8080/rest/demo/large-response")
+            .header(HttpHeaders.ACCEPT_ENCODING, "gzip, deflate")
+            .exchange { request, response ->
+                    //logger.info(response.headers.get(HttpHeaders.CONTENT_ENCODING)?.get(0)?.let { "Content-Encoding: $it" } ?: "No Content-Encoding header found")
+                handleEncodedResponse(response)
+            }
+        return response
+    }
+
+    fun postLargeResponseCompressed(): LargeResponse? {
+        val outputStream = ByteArrayOutputStream()
+        GZIPOutputStream(outputStream).use { gzipOutputStream ->
+            val json = this.objectMapper.writeValueAsString(this.createLargeResponse());
+            gzipOutputStream.write(json.toByteArray(), 0, json.toByteArray().size)
+            gzipOutputStream.close()
+        }
+        val content = outputStream.toByteArray()
+        logger.info("Sending post request with content length: ${content.size} bytes")
+        val response = restClient.post().uri("http://localhost:8080/rest/demo/large-response")
+            .header(HttpHeaders.CONTENT_ENCODING, "gzip")
+            .header(HttpHeaders.ACCEPT_ENCODING, "gzip, deflate")
+            .header(HttpHeaders.CONTENT_TYPE, "application/json")
+            .body(content)
+            .exchange { request, response ->
+                handleEncodedResponse(response)
+            }
+        return response
+    }
+
+    private fun createLargeResponse(): LargeResponse {
+        // Same implementation as in ResponseService
+    }
+
+    private fun handleEncodedResponse(response: RestClient.RequestHeadersSpec.ConvertibleClientHttpResponse): LargeResponse? {
+        var result: LargeResponse? = null
+        val responseContent = response.body.readAllBytes()
+        logger.info("Response content length: ${responseContent.size} bytes")
+        if (response.headers.get(HttpHeaders.CONTENT_ENCODING)?.contains("gzip") == true) {
+            result = this.objectMapper.readValue(GZIPInputStream(ByteArrayInputStream( responseContent)), LargeResponse::class.java)
+        } else if (response.headers.get(HttpHeaders.CONTENT_ENCODING)?.contains("deflate") == true) {
+            result = this.objectMapper.readValue(DeflaterInputStream(ByteArrayInputStream( responseContent)), LargeResponse::class.java)
+        } else if (response.headers.get(HttpHeaders.CONTENT_ENCODING) == null || response.headers.get(HttpHeaders.CONTENT_ENCODING)
+                ?.isEmpty() == true
+        ) {
+            result = this.objectMapper.readValue(responseContent, LargeResponse::class.java)
+        } else {
+            throw IllegalStateException("Unsupported content encoding: ${response.headers.get(HttpHeaders.CONTENT_ENCODING)}")
+        }
+        return result
+    }
+}
+```
+The `DemoRestClient` class first create a RestClient and an ObjectMapper to be used to call the Rest endpoints. 
+The `handleEvent()` method is annotated with `@EventListener` to be called after the application has started. It 
+calls the `getLargeResponse()` to send a plaintext request to the server, the `getLargeResponseCompressed()` to send a request for an compressed response
+and `postLargeResponseCompressed()` to send a compressed body in the request and receive a compressed body in the response. 
+
+The `getLargeResponse()` method sends a GET request with the `Accept-Encoding: identity` header to the Rest endpoint to recieve a plaintext response.
+The `getLargeResponseCompressed()` method sends a GET request with the `Accept-Encoding: gzip, deflate` header to the Rest endpoint to receive a compressed response.
+The `postLargeResponseCompressed()` method sends a POST request with the `Accept-Encoding: gzip, deflate` header, a `Content-Encoding: gzip` header, a `Content-Type: application/json` header and a compressed body expects a compressed response.
+All three methods use the `handleEncodedResponse()` method to handle the response and return the `LargeResponse` object. 
+The `handleEncodedResponse()` method checks the `Content-Encoding` header of the response and decompresses the response body accordingly.
+The ObjectMapper is then used to deserialize the response body into a `LargeResponse` object and then returned.
+
+## Test results
+The size of the Json response is 5488892 bytes. 
+The size of the gRPC response is 3243294 bytes.
+The size of the compressed Json is 2747233 bytes.
+Json is a verbose format that is human readable but causes a large response size.
+gRPC is a binary format that is not human readable with a smaller response size and probably faster processing time.
+The compressed Json response is smaller than both alternatives, but probably the processing time is slower.
+
+## Conclusion
