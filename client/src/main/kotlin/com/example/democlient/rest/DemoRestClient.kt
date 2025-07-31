@@ -28,11 +28,23 @@ class DemoRestClient {
     fun handleEvent(event: ApplicationReadyEvent) {
         val response = this.getLargeResponse()
         logger.info("Received get response with ${response?.keyValuePairs?.size} key-value pairs.")
-        val postResponse = this.postLargeResponse()
-        logger.info("Received post response with ${postResponse?.keyValuePairs?.size} key-value pairs.")
+        val responseCompressed = this.getLargeResponseCompressed()
+        logger.info("Received get compressed response with ${responseCompressed?.keyValuePairs?.size} key-value pairs.")
+        val postResponse = this.postLargeResponseCompressed()
+        logger.info("Received post compresssed request/response with ${postResponse?.keyValuePairs?.size} key-value pairs.")
     }
 
     fun getLargeResponse(): LargeResponse? {
+        val response = restClient.get().uri("http://localhost:8080/rest/demo/large-response")
+            .header(HttpHeaders.ACCEPT_ENCODING, "identity")
+            .exchange { request, response ->
+                //logger.info(response.headers.get(HttpHeaders.CONTENT_ENCODING)?.get(0)?.let { "Content-Encoding: $it" } ?: "No Content-Encoding header found")
+                handleEncodedResponse(response)
+            }
+        return response
+    }
+
+    fun getLargeResponseCompressed(): LargeResponse? {
         val response = restClient.get().uri("http://localhost:8080/rest/demo/large-response")
             .header(HttpHeaders.ACCEPT_ENCODING, "gzip, deflate")
             .exchange { request, response ->
@@ -42,7 +54,7 @@ class DemoRestClient {
         return response
     }
 
-    fun postLargeResponse(): LargeResponse? {
+    fun postLargeResponseCompressed(): LargeResponse? {
         val outputStream = ByteArrayOutputStream()
         GZIPOutputStream(outputStream).use { gzipOutputStream ->
             val json = this.objectMapper.writeValueAsString(this.createLargeResponse());

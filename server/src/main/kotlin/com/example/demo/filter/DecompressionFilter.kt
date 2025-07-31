@@ -10,7 +10,7 @@ import java.util.zip.DeflaterInputStream
 import java.util.zip.GZIPInputStream
 
 @Component
-class GZipFilter: Filter {
+class DecompressionFilter: Filter {
 
     override fun doFilter(
         request: ServletRequest?,
@@ -22,13 +22,12 @@ class GZipFilter: Filter {
     }
 }
 
-class DecompressionWrapper(request: HttpServletRequest, contentEncoding: String): HttpServletRequestWrapper(request) {
+class DecompressionWrapper(request: HttpServletRequest, val contentEncoding: String): HttpServletRequestWrapper(request) {
     enum class ContentEncoding(val value: String) {
         GZIP("gzip"), DEFLATE("deflate")
     }
     val sourceStream = if(contentEncoding == ContentEncoding.GZIP.value)  GZIPInputStream(request.inputStream) else if(contentEncoding == ContentEncoding.DEFLATE.value) DeflaterInputStream(request.inputStream) else request.inputStream
     private var finished = false
-    private val myContentEncoding = contentEncoding
 
     override fun getInputStream(): ServletInputStream {
         val decompressionObject =  object : ServletInputStream() {
@@ -66,7 +65,7 @@ class DecompressionWrapper(request: HttpServletRequest, contentEncoding: String)
                 throw UnsupportedOperationException()
             }
         }
-        return if( myContentEncoding == ContentEncoding.GZIP.value || myContentEncoding == ContentEncoding.DEFLATE.value) {
+        return if( contentEncoding == ContentEncoding.GZIP.value || contentEncoding == ContentEncoding.DEFLATE.value) {
             decompressionObject
         } else {
             request.inputStream
