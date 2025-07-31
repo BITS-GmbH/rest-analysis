@@ -187,3 +187,4 @@ class ResponseService {
 The method `createLargeResponse()` generates a large response with 100,000 key-value pairs. The keys are random strings of 20 characters and the values are random long numbers.
 The `customizer()` method is used to set the overhead window update threshold for the HTTP/2 protocol to 0. To ensure that there is no overhead in the response size.
 
+## The gRPC client
