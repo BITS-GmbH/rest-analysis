@@ -45,4 +45,24 @@ To add the gRPC server to the project, you need to add these gRPC dependencies t
 	<artifactId>grpc-services</artifactId>
 </dependency>
 ```
+The Spring Initializr provides a starter for gRPC. To create the gRPC endpoint the class GrpcDemoController is used.  
+```java
+@GrpcService
+class GrpcDemoController(val responseService: ResponseService): LargeResponseProviderGrpc.LargeResponseProviderImplBase() {
+    override fun getLargeResponse(request: Empty?, responseObserver: StreamObserver<LargeResponse?>?) {
+        val response = LargeResponse.newBuilder()
+            .addAllKeyValuePairs(this.responseService.createLargeResponse().keyValuePairs.map { pair ->
+                KeyValuePair.newBuilder().setKey(pair.key).setValue(pair.value).build()
+            })
+            .build()
+        responseObserver?.onNext(response)
+        responseObserver?.onCompleted()
+    }
+}
+```
+The `GrpcDemoController` class is annotated with `@GrpcService` to indicate that it is a gRPC service. The `getLargeResponse` method is the endpoint that will be called by the client. 
+It uses the `LargeResponseProviderGrpc.LargeResponseProviderImplBase` class that was generated based on the `demo.proto` file to implement the endpoint. 
+The response is built using the `LargeResponse` and `KeyValuePair` classes that are generated from the proto file.
+The `KeyValuePair` is filled with values from the `ResponseService` class, which is responsible for creating the content of the LargeResponse.
+The `responseObserver?.onNext(...)` method is used to set the value of the gRPC response. The `onComplete()` method is called to send the response.
 
