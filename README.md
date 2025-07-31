@@ -46,7 +46,7 @@ To add the gRPC server to the project, you need to add these gRPC dependencies t
 </dependency>
 ```
 The Spring Initializr provides a starter for gRPC. To create the gRPC endpoint the class GrpcDemoController is used.  
-```java
+```kotlin
 @GrpcService
 class GrpcDemoController(val responseService: ResponseService): LargeResponseProviderGrpc.LargeResponseProviderImplBase() {
     override fun getLargeResponse(request: Empty?, responseObserver: StreamObserver<LargeResponse?>?) {
