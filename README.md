@@ -66,6 +66,36 @@ The response is built using the `LargeResponse` and `KeyValuePair` classes that 
 The `KeyValuePair` is filled with values from the `ResponseService` class, which is responsible for creating the content of the LargeResponse.
 The `responseObserver?.onNext(...)` method is used to set the value of the gRPC response. The `onComplete()` method is called to send the response.
 
+The `demo.proto` file defines the gRPC service and the messages used in the service:
+```proto
+syntax = "proto3";
+
+package demoDto;
+
+option java_multiple_files = true;
+option java_package = "com.example.democlient.rpc";
+
+service LargeResponseProvider {
+  rpc getLargeResponse(Empty) returns (LargeResponse) {}
+}
+
+message LargeResponse {
+  repeated KeyValuePair keyValuePairs=1;
+}
+
+message KeyValuePair {
+  string key=1;
+  int64 value=2;
+}
+
+message Empty {}
+```
+The options `java_multiple_files` and `java_package` are used to generate the Java classes in the specified package. 
+The `LargeResponseProvider` service defines the `getLargeResponse` rpc method that takes an `Empty` message as input and returns a `LargeResponse` message.
+The `LargeResponse` message contains a repeated field of `KeyValuePair` messages, which are used to store the key-value pairs in the response.
+The `KeyValuePair` message contains a string key and a long value. 
+The `Empty` message is used as a placeholder for the input parameter of the `getLargeResponse` method.
+
 ## Implementation of the Rest server
 The setup of the Rest endpoints in Spring Boot does not need to be explained again. With theses properties Spring Boot supports the 
 response compression out of the box:
@@ -187,4 +217,45 @@ class ResponseService {
 The method `createLargeResponse()` generates a large response with 100,000 key-value pairs. The keys are random strings of 20 characters and the values are random long numbers.
 The `customizer()` method is used to set the overhead window update threshold for the HTTP/2 protocol to 0. To ensure that there is no overhead in the response size.
 
-## The gRPC client
+## The implementation of the gRPC client
+The client is implemented in the `DemoGrpcClient` class: 
+```kotlin
+@Service
+class DemoGrpcClient(val provider: LargeResponseProviderGrpc.LargeResponseProviderBlockingStub) {
+    val logger = LoggerFactory.getLogger(DemoGrpcClient::class.java)
+
+    @EventListener
+    fun handleEvent(event: ApplicationReadyEvent) {
+        val response = this.getLargeResponse()
+        logger.info("Response content length: ${response.serializedSize} bytes")
+        logger.info("Received response with ${response.keyValuePairsList.size} key-value pairs.")
+    }
+
+    fun getLargeResponse(): LargeResponse {
+        return this.provider.getLargeResponse(Empty.newBuilder().build())
+    }
+}
+```
+The `DemoGrpcClient` class gets the `LargeResponseProviderBlockingStub` injected as `provider` that is created during the build based on the `demo.proto` file.
+The method `getLargeResponse()` uses the provider to call the gRPC endpoint and return the `LargeResponse` object. The empty object is as placeholder needed for 
+a rpc method with a parameter. 
+The `handleEvent()` method is annotated with `@EventListener` to listen for the `ApplicationReadyEvent` event. This method is called after the application has started and calls the `getLargeResponse()` method to request a large response from the server.
+
+The `LargeResponseProviderBlockingStub` is a blocking stub that is used to call the gRPC endpoint is created in the `DemoGrpcConfig` class:
+```kotlin
+@Configuration
+class DemoGrpcConfig {
+    @Bean
+    fun stub(channels: GrpcChannelFactory): LargeResponseProviderGrpc.LargeResponseProviderBlockingStub? {
+        return LargeResponseProviderGrpc.newBlockingStub(channels.createChannel("large-response"))
+    }
+}
+```
+With the `@Bean` annotation the `stub()` method is used to create the `LargeResponseProviderBlockingStub` bean that is then available for injection in the `DemoGrpcClient` class.
+To enable the creation of the `LargeResponseProviderBlockingStub` bean the `large-response` channel has to be configured in the `application.properties` file:
+```properties
+spring.grpc.client.channels.large-response.address=localhost:8080
+spring.grpc.client.channels.large-response.negotiation-type=plaintext
+```
+This configuration sets the address of the gRPC server to `localhost:8080` and uses plaintext negotiation for the gRPC communication. A alternative would be encryption with TLS, but this is not used in this project.
+
