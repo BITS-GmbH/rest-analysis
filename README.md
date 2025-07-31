@@ -11,4 +11,38 @@ Maven multimodule project. The server is a normal Spring Boot Rest/gRPC applicat
 The client is also a Spring Boot application that sends the requests to the server after the startup has finished.
 Spring Boot provides support for compressed rest responses and gRPC responses with starters in the spring initilzr.
 
-## 
+## How to run the project
+1. Clone the repository
+2. Import the project into your IDE
+3. Import the Maven dependencies
+4. Start the server with the DemoApplication class
+5. Start the client with the DemoclientApplication class
+6. Inspect the logs of the server and the client
+
+## Rest and gRPC Protocols
+The Rest protocol is the standard to communicate with endpoints to request and send data. It is human readable
+and has very good support in Spring Boot. It has large body sizes due the good readability, because of this 
+Spring Boot supports the compression of the responses out of the box with these values in the application.properties file:
+```properties
+server.compression.enabled=true
+server.compression.min-response-size=2048
+server.compression.mime-types=text/html,text/xml,text/plain,text/css,application/json
+```
+The gRPC protocol is a binary protocol that is used to communicate with endpoints. It is not human readable
+and has a smaller body size than the Rest protocol. It needs a proto file to define the dtos and the service endpoints.
+The contents of the proto file is compiled during the build to Java classes that can be used to implement the service endpoints.
+The proto file can be found in the `src/main/proto` directory.
+
+## Implementation of the gRPC server
+To add the gRPC server to the project, you need to add these gRPC dependencies to the server's pom.xml file:
+```xml
+<dependency>
+	<groupId>org.springframework.grpc</groupId>
+	<artifactId>spring-grpc-server-web-spring-boot-starter</artifactId>
+</dependency>
+<dependency>
+	<groupId>io.grpc</groupId>
+	<artifactId>grpc-services</artifactId>
+</dependency>
+```
+
