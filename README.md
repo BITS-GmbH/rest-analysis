@@ -353,12 +353,21 @@ All three methods use the `handleEncodedResponse()` method to handle the respons
 The `handleEncodedResponse()` method checks the `Content-Encoding` header of the response and decompresses the response body accordingly.
 The ObjectMapper is then used to deserialize the response body into a `LargeResponse` object and then returned.
 
+### Conclusion Rest client
+The rest client looks like more work, but it can be implemented in a generic way to handle the additional headers and the compression/decompression of the bodies. The developer 
+would just provide the url the request content and the response type. The rest client can be really userfriendly and easy to use.
+
 ## Test results
-The size of the Json response is 5488892 bytes. 
-The size of the gRPC response is 3243294 bytes.
-The size of the compressed Json is 2747233 bytes.
-Json is a verbose format that is human readable but causes a large response size.
-gRPC is a binary format that is not human readable with a smaller response size and probably faster processing time.
+- The size of the Json response is 5488892 bytes. 
+- The size of the gRPC response is 3243294 bytes.
+- The size of the compressed Json is 2747233 bytes. (The size is unusually large because of the random strings and numbers used in the response. A compression of 70% or more is normal for Json strings.)
+- Json is a verbose format that is human readable but causes a large response size.
+- gRPC is a binary format that is not human readable with a smaller response size and probably faster processing time.
+
 The compressed Json response is smaller than both alternatives, but probably the processing time is slower.
 
 ## Conclusion
+The right choice of the protocol depends on the use case. 
+- If the amount of calls to the endpoint is low then an optimization is not needed and the human readable Json format will save time during development and maintainance.
+- If the amount of calls is high and the request/response size is large then compressed Json is a good choice to reduce latency and traffic volume. It preserves the human readability of the Json format and has the lowest network load.
+- If the amount of calls is high and the request/response size is large and the service is cpu constrained then gRPC is a good choice to reduce network load with low cpu load. It is not human readable but has a smaller response size and faster processing time. 
