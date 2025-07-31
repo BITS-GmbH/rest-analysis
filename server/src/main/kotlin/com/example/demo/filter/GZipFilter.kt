@@ -31,8 +31,6 @@ class DecompressionWrapper(request: HttpServletRequest, contentEncoding: String)
     private val myContentEncoding = contentEncoding
 
     override fun getInputStream(): ServletInputStream {
-
-
         val decompressionObject =  object : ServletInputStream() {
 
             @Throws(IOException::class)
