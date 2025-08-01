@@ -1,15 +1,19 @@
 # Analysis of compressed rest to gRPC
 
 ## Mission statement
-This project is used to analyze the network traffic of rest, compressed rest and gRPC. First to compare the 
+The network calls between clients and servers that are not located next to each other can become a bottleneck.
+The network latency rises with the size of the request and response bodies. That can become an issue if multiple calls
+are made and the user waits for the response. 
+
+This project shows options that are available and analyzes the network traffic of rest, compressed rest and gRPC. First to compare the 
 plain text rest with gRPC and then to test what is needed to use compressed rest and compare it with gRPC.
 
 ## Project setup
-The project has a client and a server. The client sends the rest/gRPC requests to the server and the server
+The project has a client and a server. The client sends the Rest/gRPC requests to the server and the server
 responds to the client. The client and server are implemented in Kotlin with Spring Boot and are both in a
 Maven multimodule project. The server is a normal Spring Boot Rest/gRPC application that can handle the requests.
 The client is also a Spring Boot application that sends the requests to the server after the startup has finished.
-Spring Boot provides support for compressed rest responses and gRPC responses with starters in the spring initilzr.
+Spring Boot provides support for compressed rest responses and gRPC responses with starters in the Spring Initializr.
 
 ## How to run the project
 1. Clone the repository
@@ -97,7 +101,7 @@ The `KeyValuePair` message contains a string key and a long value.
 The `Empty` message is used as a placeholder for the input parameter of the `getLargeResponse` method.
 
 ## Implementation of the Rest server
-The setup of the Rest endpoints in Spring Boot does not need to be explained again. With theses properties Spring Boot supports the 
+The setup of the Rest endpoints in Spring Boot does not need to be explained again. With these properties, Spring Boot supports the 
 response compression out of the box:
 ```properties
 server.compression.enabled=true
@@ -174,7 +178,7 @@ class DecompressionWrapper(request: HttpServletRequest, val contentEncoding: Str
     }
 }
 ```
-The `DecompressionFilter` class is a filter, that is used in the Spring Boot filter chain for tomcat. All requests and responses pass through this filter in the chain. 
+The `DecompressionFilter` class is a filter, that is used in the Spring Boot filter chain for Tomcat. All requests and responses pass through this filter in the chain. 
 The `DecompressionFilter` uses the `DecompressionWrapper` class to handle the request input stream according to the Content-Encoding header value.
 The `DecompressionWrapper` class checks the Content-Encoding header and uses the appropriate decompression InputStream (GZIP or DEFLATE) to wrap the request input stream.
 The `getInputStream()` method creates and returns a `ServletInputStream` object with the wrapped input stream based on the Content-Encoding header value or returns the original ServletInputStream.
@@ -237,11 +241,11 @@ class DemoGrpcClient(val provider: LargeResponseProviderGrpc.LargeResponseProvid
 }
 ```
 The `DemoGrpcClient` class gets the `LargeResponseProviderBlockingStub` injected as `provider` that is created during the build based on the `demo.proto` file.
-The method `getLargeResponse()` uses the provider to call the gRPC endpoint and return the `LargeResponse` object. The empty object is as placeholder needed for 
+The method `getLargeResponse()` uses the provider to call the gRPC endpoint and return the `LargeResponse` object. The empty object is a placeholder needed for 
 a rpc method without a parameter. 
 The `handleEvent()` method is annotated with `@EventListener` to listen for the `ApplicationReadyEvent` event. This method is called after the application has started and calls the `getLargeResponse()` method to request a large response from the server.
 
-The `LargeResponseProviderBlockingStub` is a blocking stub that is used to call the gRPC endpoint is created in the `DemoGrpcConfig` class:
+The `LargeResponseProviderBlockingStub` is a blocking stub that is used to call the gRPC endpoint and is created in the `DemoGrpcConfig` class:
 ```kotlin
 @Configuration
 class DemoGrpcConfig {
@@ -346,28 +350,32 @@ The `handleEvent()` method is annotated with `@EventListener` to be called after
 calls the `getLargeResponse()` to send a plaintext request to the server, the `getLargeResponseCompressed()` to send a request for an compressed response
 and `postLargeResponseCompressed()` to send a compressed body in the request and receive a compressed body in the response. 
 
-The `getLargeResponse()` method sends a GET request with the `Accept-Encoding: identity` header to the Rest endpoint to recieve a plaintext response.
+The `getLargeResponse()` method sends a GET request with the `Accept-Encoding: identity` header to the Rest endpoint to receive a plaintext response.
 The `getLargeResponseCompressed()` method sends a GET request with the `Accept-Encoding: gzip, deflate` header to the Rest endpoint to receive a compressed response.
-The `postLargeResponseCompressed()` method sends a POST request with the `Accept-Encoding: gzip, deflate` header, a `Content-Encoding: gzip` header, a `Content-Type: application/json` header and a compressed body expects a compressed response.
+The `postLargeResponseCompressed()` method sends a POST request with the `Accept-Encoding: gzip, deflate` header, a `Content-Encoding: gzip` header, a `Content-Type: application/json` header and a compressed body and expects a compressed response back.
 All three methods use the `handleEncodedResponse()` method to handle the response and return the `LargeResponse` object. 
 The `handleEncodedResponse()` method checks the `Content-Encoding` header of the response and decompresses the response body accordingly.
-The ObjectMapper is then used to deserialize the response body into a `LargeResponse` object and then returned.
+The ObjectMapper is then used to deserialize the response body into a `LargeResponse` object and then return it.
 
 ### Conclusion Rest client
 The rest client looks like more work, but it can be implemented in a generic way to handle the additional headers and the compression/decompression of the bodies. The developer 
-would just provide the url the request content and the response type. The rest client can be really userfriendly and easy to use.
+would just provide the url, the request content, the request command(Get,Put, Post, Delete) and the response type. The rest client can be wrapped to be really userfriendly and easy to use.
 
 ## Test results
 - The size of the Json response is 5488892 bytes. 
 - The size of the gRPC response is 3243294 bytes.
-- The size of the compressed Json is 2747233 bytes. (The size is unusually large because of the random strings and numbers used in the response. A compression of 70% or more is normal for Json strings.)
+- The size of the compressed Json is 2747233 bytes. (The size is unusually large because of the random strings and numbers used in the response. A compression rate of 70% or more is normal for Json strings.)
 - Json is a verbose format that is human readable but causes a large response size.
 - gRPC is a binary format that is not human readable with a smaller response size and probably faster processing time.
 
-The compressed Json response is smaller than both alternatives, but probably the processing time is slower.
+The compressed Json response is smaller than both alternatives, but probably the processing time is higher.
 
 ## Conclusion
 The right choice of the protocol depends on the use case. 
-- If the amount of calls to the endpoint is low then an optimization is not needed and the human readable Json format will save time during development and maintainance.
+- If the amount of calls to the endpoint is low then an optimization is not needed and the human readable Json format will save time during development and maintainance. 
 - If the amount of calls is high and the request/response size is large then compressed Json is a good choice to reduce latency and traffic volume. It preserves the human readability of the Json format and has the lowest network load.
 - If the amount of calls is high and the request/response size is large and the service is cpu constrained then gRPC is a good choice to reduce network load with low cpu load. It is not human readable but has a smaller response size and faster processing time. 
+
+Finally, the golden rule of software development applies:
+
+**Only optimize if the problem can be measured in time or money.**
