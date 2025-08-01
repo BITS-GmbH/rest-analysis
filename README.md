@@ -1,11 +1,11 @@
-# Analysis of compressed rest to gRPC
+# Analysis of Rest, compressed Rest and gRPC
 
 ## Mission statement
 The network calls between clients and servers that are not located next to each other can become a bottleneck.
-The network latency rises with the size of the request and response bodies. That can become an issue if multiple calls
+The network latency rises with the size of the request and response bodies. That can become an issue if multiple dependent calls
 are made and the user waits for the response. 
 
-This project shows options that are available and analyzes the network traffic of rest, compressed rest and gRPC. First to compare the 
+This project shows options that are available and analyzes the network traffic of Rest, compressed Rest and gRPC. First to compare the 
 plain text rest with gRPC and then to test what is needed to use compressed rest and compare it with gRPC.
 
 ## Project setup
