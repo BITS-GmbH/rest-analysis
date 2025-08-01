@@ -378,4 +378,4 @@ The right choice of the protocol depends on the use case.
 
 Finally, the golden rule of software development applies:
 
-**Only optimize if the problem can be measured in time or money.**
+**Premature optimization is the root of all evil.**
